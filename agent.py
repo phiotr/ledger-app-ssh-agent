@@ -23,6 +23,7 @@ import argparse
 import struct
 import base64
 import os 
+import sys
 import socket
 import tempfile
 import thread
@@ -165,6 +166,9 @@ parser.add_argument('--path', help="BIP 32 path to use")
 parser.add_argument('--key', help="SSH encoded key to use")
 parser.add_argument("--ed25519", help="Use Ed25519 curve", action='store_true')
 parser.add_argument('--debug', help="Display debugging information", action='store_true')
+parser.add_argument('--socket', help='Path for the socket file')
+parser.add_argument('--export', help='Write evironment configuration to given export file')
+
 args = parser.parse_args()
 
 if args.path == None:
@@ -178,11 +182,22 @@ if args.debug:
 
 keyBlob = base64.b64decode(args.key)
 
-socketPath = tempfile.NamedTemporaryFile(prefix=SOCK_PREFIX, delete=False)
+exportFile = open(args.export, "w") if args.export else sys.stdout
+socketPath = open(args.socket, "rw") if args.socket else tempfile.NamedTemporaryFile(prefix=SOCK_PREFIX, delete=False)
+
 os.unlink(socketPath.name)
-print "Export those variables in your shell to use this agent"
-print "export SSH_AUTH_SOCK=" + socketPath.name
-print "export SSH_AGENT_PID=" + str(os.getpid())
+
+if (exportFile == sys.stdout):
+    print "Export those variables in your shell to use this agent"
+    print "export SSH_AUTH_SOCK=" + socketPath.name
+    print "export SSH_AGENT_PID=" + str(os.getpid())
+else:
+    print >> exportFile, "export SSH_AUTH_SOCK=" + socketPath.name
+    print >> exportFile, "export SSH_AGENT_PID=" + str(os.getpid())
+    exportFile.flush()
+    print "Source environmental settings to your shell to use this agent"
+    print "source " + exportFile.name
+
 print "Agent running ..."
 
 server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
